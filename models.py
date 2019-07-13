@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 class LSTM_Autoencoder:
-    def __init__(self, V, D, seq_len, n_hidden = 128, lr = 1e-5,
+    def __init__(self, V, D, seq_len, n_hidden = 64, lr = 1e-4,
                 optimizer = tf.train.AdamOptimizer,
                 loss_fun = tf.nn.sampled_softmax_loss):
         self.V = V
@@ -39,10 +39,8 @@ class LSTM_Autoencoder:
         self.learning_rate = tf.placeholder(tf.float32, shape = [], name = "LR")
 
         embedded = tf.nn.embedding_lookup(self.weights_embedding, self.tfX)
-        rnn_unit1 = tf.nn.rnn_cell.LSTMCell(num_units = M2, activation = activation)
-        rnn_unit2 = tf.nn.rnn_cell.LSTMCell(num_units = M2, activation = activation)
-        rnn_unit = tf.nn.rnn_cell.MultiRNNCell([rnn_unit1, rnn_unit2])                   
-        outputs, states = tf.nn.dynamic_rnn(rnn_unit, embedded, dtype = tf.float32)           
+        rnn_unit1 = tf.nn.rnn_cell.LSTMCell(num_units = M2, activation = activation)                 
+        outputs, states = tf.nn.dynamic_rnn(rnn_unit1, embedded, dtype = tf.float32)           
         multi = tf.reshape(tf.matmul(tf.reshape(outputs, [-1, M2]), self.W0), 
                             [-1, self.seq_len, self.V])     
         self.logits = multi + self.h0        
@@ -63,7 +61,7 @@ class LSTM_Autoencoder:
         self.train_op = self.optimizer(self.lr).minimize(self.cost)
     
 
-    def fit(self, X, Y, epochs = 20, batch_size = 8, validation_split = 0.2, 
+    def fit(self, X, Y, epochs = 200, batch_size = 32, validation_split = 0.2, 
             show_fig = True):
         X = pad_sequences(X, maxlen = self.seq_len, padding = "post", 
                             truncating = "post")
@@ -89,14 +87,9 @@ class LSTM_Autoencoder:
                         self.tfY: y_batch,
                         self.learning_rate: self.lr,
                     })
-                
-                if np.isnan(np.array([c])):
-                    print(x_batch)
-                    print(y_batch)
-                    exit()
                 cost += c
                 if i % 50 == 0:
-                    print("Epoch: {}/{}\t Batch: {}/{}\t Current cost per batch: {}".format(epoch, epochs, i, n_batches, c))
+                    print("Epoch: {}/{}\t Batch: {}/{}\t Current cost per batch: {}".format(epoch + 1, epochs, i, n_batches, c))
                 costs.append(cost)
         cur_score = self.score(X_train, Y_train)
         val_score = self.score(X_test, Y_test)
