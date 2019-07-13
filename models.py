@@ -79,7 +79,6 @@ class LSTM_Keras:
         progress = self.model.fit(inputs, outputs, epochs = epochs, batch_size = batch_sz,
                         validation_split = validation_split, shuffle = shuffle)
         self.model.evaluate(inputs, outputs)
-        import ipdb; ipdb.set_trace()
 
     
     def _pad_and_split(self, X, Y):

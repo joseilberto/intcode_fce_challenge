@@ -32,7 +32,7 @@ def get_labels(labels_dict):
             if mistake_type not in label2idx:
                 label2idx[mistake_type] = current_idx
                 current_idx += 1
-            types.append(current_idx - 1)
+            types.append(label2idx[mistake_type])
         incorrect_positions.append(incorrect)
         correct_positions.append(correct)
         labels_types.append(types)
@@ -75,7 +75,7 @@ def get_indexed_sentences(actual_sentences, word2idx, current_idx, filters):
             if word not in word2idx:
                 word2idx[word] = current_idx
                 current_idx += 1
-            sentence.append(current_idx - 1)
+            sentence.append(word2idx[word])
             cumulative += len(word)
             cum_size.append(cumulative)    
             if sep:
