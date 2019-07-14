@@ -1,3 +1,5 @@
+from difflib import SequenceMatcher
+
 import numpy as np
 
 def get_correct_positions(data, word2idx, label2idx):
@@ -13,28 +15,52 @@ def get_correct_positions(data, word2idx, label2idx):
 
     incorrect_positions = data["incorrect_positions"].tolist() #delete when done
     correct_positions = data["correct_positions"].tolist() #delete when done
-           
-    for idx, inc_text_pos in enumerate(incorrect_text_pos):
-        cor_text_pos = correct_text_pos[idx]
-        incor_pos = incorrect_positions[idx]
-        cor_pos = correct_positions[idx]
-        assert(set(incor_pos).issubset(inc_text_pos))
-        assert(set(cor_pos).issubset(cor_text_pos))            
 
-    incor_positions = []
-    cor_positions = []
+    incor_pos_found = []
+    cor_pos_found = []
     found_corrects = []
-    for idx, sentence in enumerate(incorrect_idxs):
-        correct = correct_idxs[idx]        
-        found_correct_sentence = []
-        for idx2, word in enumerate(sentence):
-            correct_word = correct[idx2]
-            if word == correct_word:
-                found_correct_sentence.append(idx2word[correct_word]) 
-                continue
-            else:
-                max_idx = max(idx2 + 10, len(correct))
-                context = [correct[i] for i in range(idx2, max_idx)]
-                for idx_context, context_word in enumerate(context):
-                    continue
+    for idx in range(len(incorrect_idxs)):
+        incorrect_sentence = incorrect_idxs[idx]
+        correct_sentence = correct_idxs[idx]
+        incor_text_pos = incorrect_text_pos[idx]
+        cor_text_pos = correct_text_pos[idx]
+        found_data = get_correct_sentence(correct_sentence, incorrect_sentence,
+                                            cor_text_pos, incor_text_pos)
+        incor_pos_found.append(found_data[0])
+        cor_pos_found.append(found_data[1])
+    
+    for idx, correct_pos in enumerate(correct_positions):
+        incorrect_pos = incorrect_positions[idx]
+        cors_found = cor_pos_found[idx]
+        incors_found = incor_pos_found[idx]    
+        import ipdb; ipdb.set_trace()
 
+
+def get_correct_sentence(cor, incor, cor_text_pos, incor_text_pos):
+    incor_position = []
+    cor_position = []
+    found_correct = []
+    if incor[0] != cor[0]:
+        incor_position.append(0)
+        cor_position.append(0)
+        incor = incor[1:]
+        cor = cor[1:]
+    matches = SequenceMatcher(None, incor, cor, autojunk = False).get_matching_blocks()
+    for match in matches[:-1]:
+        idx_incor, idx_cor, size = match.a, match.b, match.size                  
+        incor_position.append(incor_text_pos[idx_incor + size])
+        cor_position.append(cor_text_pos[idx_cor + size])
+    if not incor_position:
+        incor_position.append(0)
+    if not cor_position:
+        cor_position.append(0)
+    incor_position = (incor_position[:-1] if len(incor_position) > 1 
+                        else incor_position)
+    cor_position = (cor_position[:-1] if len(cor_position) > 1
+                        else cor_position) 
+    return incor_position, cor_position
+
+                
+def get_next_match(correct_sentence, incorrect_sentence, idx):
+    correct_left = correct_sentence[idx:]
+    incorrect_left = incorrect_sentence[idx:]

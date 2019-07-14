@@ -5,8 +5,8 @@ from constants import filters, spliters, sep_exclusions, word_exceptions
 
 def initial_instance(filters, spliters):
     word2idx = {
-    "": 0, 
-    " ": 1,                          
+    "": 1, 
+    " ": 2,                          
     }
     current_idx = max(word2idx.values()) + 1
     word2idx.update({fil: idx for idx, fil in enumerate(list(filters), 
@@ -57,6 +57,8 @@ def get_indices(data, filters = filters, spliters = spliters):
             get_indexed_sentences(incorrects, word2idx, current_idx, filters, spliters))
     incorrect_positions, correct_positions, labels_types, label2idx = (
                                                 get_labels(data["labels"]))
+    check_position_matches(incorrect_text_pos, correct_text_pos,
+                                        incorrect_positions, correct_positions)
     data["correct_indexed"] = correct_sentences
     data["incorrect_indexed"] = incorrect_sentences
     data["correct_text_pos"] = correct_text_pos
@@ -65,6 +67,16 @@ def get_indices(data, filters = filters, spliters = spliters):
     data["correct_positions"] = correct_positions
     data["labels_types"] = labels_types
     return data, word2idx, label2idx
+
+
+def check_position_matches(incorrect_text_pos, correct_text_pos,
+                                        incorrect_positions, correct_positions):
+    for idx, inc_text_pos in enumerate(incorrect_text_pos):
+        cor_text_pos = correct_text_pos[idx]
+        incor_pos = incorrect_positions[idx]
+        cor_pos = correct_positions[idx]
+        assert(set(incor_pos).issubset(inc_text_pos))
+        assert(set(cor_pos).issubset(cor_text_pos))
 
 
 def get_indexed_sentences(actual_sentences, word2idx, current_idx, filters, spliters):
