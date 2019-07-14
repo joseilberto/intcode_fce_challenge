@@ -18,18 +18,9 @@ def get_correct_positions(data, word2idx, label2idx):
         cor_text_pos = correct_text_pos[idx]
         incor_pos = incorrect_positions[idx]
         cor_pos = correct_positions[idx]
-        if not set(incor_pos).issubset(inc_text_pos):
-            not_in = [pos for pos in incor_pos if pos not in inc_text_pos]
-            reconstruct = "".join([idx2word[word] for word in incorrect_idxs[idx]])
-            sentence_problem = incorrect_sentences[idx]
-            import ipdb; ipdb.set_trace()
-        if not set(cor_pos).issubset(cor_text_pos):
-            not_in = [pos for pos in cor_pos if pos not in cor_text_pos]
-            reconstruct = "".join([idx2word[word] for word in correct_idxs[idx]])
-            sentence_problem = correct_sentences[idx]
-            import ipdb; ipdb.set_trace()
+        assert(set(incor_pos).issubset(inc_text_pos))
+        assert(set(cor_pos).issubset(cor_text_pos))            
 
-    import ipdb; ipdb.set_trace()
     incor_positions = []
     cor_positions = []
     found_corrects = []

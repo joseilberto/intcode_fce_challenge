@@ -90,30 +90,24 @@ def get_indexed_sentences(actual_sentences, word2idx, current_idx, filters, spli
 def apply_filters(word, filters, recursion = True):    
     for char in filters:
         if word.startswith(char):
-            return apply_filters(word[1:], filters)
+            return apply_filters(word[len(char):], filters)
     for char in filters:
-        if word.endswith(char):
-            return apply_filters(word[:-1], filters)
+        if word.endswith(char):              
+            return apply_filters(word[:-len(char)], filters)    
     return word    
 
 
 def parse_exceptions(word, updater):
-    if word == "musicAnyway":
-        updater = update_data("music", *updater)
-        updater = update_data("Anyway", *updater)
-    elif word == "longbut":
-        updater = update_data("long", *updater)
-        updater = update_data("but", *updater)
-    elif word == "usedMoreover":
-        updater = update_data("used", *updater)
-        updater = update_data("Moreover", *updater)
-    elif word == "questionit":
-        updater = update_data("question", *updater)
-        updater = update_data("it", *updater)
+    if word == "16.12.2000y":
+        updater = update_data("16.12.2000", *updater)
+        return update_data("y", *updater)
+    typos = large_typo(word, updater[3])
+    for typo in typos:
+        updater = update_data(typo, *updater)
     return updater
 
 
-def split_word(word, splited, updater):
+def split_word(word, splited, updater, filters):
     for spliter in splited:
         if spliter in word:
             splits = word.split(spliter)
@@ -123,8 +117,9 @@ def split_word(word, splited, updater):
                 splits = [splits[-1]]
                 updater = update_data(spliter, *updater)
             for idx, sep_word in enumerate(splits):
-                updater = split_word(sep_word, splited, updater)                
-                updater = update_data(sep_word, *updater)
+                updater = split_word(sep_word, splited, updater, filters)
+                isolated = apply_filters(sep_word, filters)                                
+                updater = update_from_isolated(sep_word, isolated, updater, [], filters)
                 if idx < len(splits) - 1:
                     updater = update_data(spliter, *updater)
     return updater
@@ -132,12 +127,12 @@ def split_word(word, splited, updater):
 
 def update_for_word(word, updater, filters, spliters):  
     isolated_word = apply_filters(word, filters)
-    splited = [char for char in spliters if char in word]               
-    updater = update_from_isolated(word, isolated_word, updater, splited)            
+    splited = [char for char in spliters if char in isolated_word]                   
+    updater = update_from_isolated(word, isolated_word, updater, splited, filters)            
     return updater
 
 
-def update_from_isolated(word, isolated_word, updater, splited):    
+def update_from_isolated(word, isolated_word, updater, splited, filters):    
     idx_min = word.find(isolated_word)
     idx_max = idx_min + len(isolated_word)
     condition = (idx_max - idx_min == len(word) 
@@ -155,7 +150,7 @@ def update_from_isolated(word, isolated_word, updater, splited):
         else:
             updater = update_data(isolated_word, *updater)
     else:
-        updater = split_word(isolated_word, splited, updater)        
+        updater = split_word(isolated_word, splited, updater, filters)        
     if idx_min + len(isolated_word) < len(word):            
         for idx in range(idx_max, len(word)):
             char = word[idx]
@@ -173,22 +168,21 @@ def update_data(word, sentence, cumulative, cum_size, word2idx, current_idx):
     return sentence, cumulative, cum_size, word2idx, current_idx
 
 
-def large_typo(isolated_word, word2idx, reference = 7):
-    if len(isolated_word) => 7:
-        largest = ""        
-        for idx in range(1, len(isolated_word)):
-            word = word[:idx]
-            if word in word2idx or word.lower() in word2idx:
-                largest = word if len(word) > len(largest) else largest
-        if largest == isolated_word:
-            return
-        elif len(largest) > len(isolated_word) / 2:            
-            remainder = isolated_word.replace(largest, "")
-            if remainder in word2idx or remainder.lower() in word2idx:
-                idx_largest = isolated_word.find(largest)
-                if idx_largest == 0:
-                    return [largest, remainder]
-                else:
-                    return [remainder, largest]
+def large_typo(isolated_word, word2idx):    
+    largest = ""        
+    for idx in range(1, len(isolated_word)):
+        word = isolated_word[:idx]
+        if word in word2idx or word.lower() in word2idx:
+            largest = word if len(word) > len(largest) else largest
+    
+    remainder = isolated_word.replace(largest, "")    
+    if remainder in word2idx or remainder.lower() in word2idx:
+        idx_largest = isolated_word.find(largest)
+        if idx_largest == 0:
+            return [largest, remainder]
+        else:
+            return [remainder, largest]
+    elif remainder == ".lf":
+        return [largest, ".", "lf"]
 
         
