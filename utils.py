@@ -1,6 +1,21 @@
 from math import isnan
 
-from constants import filters, spliters
+from constants import filters, spliters, sep_exclusions, word_exceptions
+
+
+def initial_instance(filters, spliters):
+    word2idx = {
+    "": 0, 
+    " ": 1,                          
+    }
+    current_idx = max(word2idx.values()) + 1
+    word2idx.update({fil: idx for idx, fil in enumerate(list(filters), 
+                        start = current_idx)})                        
+    current_idx = max(word2idx.values()) + 1
+    word2idx.update({spliter: idx for idx, spliter in enumerate(list(spliters), 
+                        start = current_idx)})
+    current_idx = max(word2idx.values()) + 1
+    return word2idx, current_idx
 
 
 def get_labels(labels_dict):
@@ -35,15 +50,7 @@ def get_labels(labels_dict):
 def get_indices(data, filters = filters, spliters = spliters):       
     corrects = data["correct_sentence"].tolist()
     incorrects = data["incorrect_sentence"].tolist()
-    word2idx = {
-        "": 0, 
-        " ": 1, 
-        "-": 2,                       
-        }
-    current_idx = max(word2idx.values()) + 1
-    word2idx.update({fil: idx for idx, fil in enumerate(list(filters), 
-                        start = current_idx)})
-    current_idx = max(word2idx.values()) + 1
+    word2idx, current_idx = initial_instance(filters, spliters)
     correct_sentences, correct_text_pos, word2idx, current_idx = (
             get_indexed_sentences(corrects, word2idx, current_idx, filters, spliters))
     incorrect_sentences, incorrect_text_pos, word2idx, current_idx = (
@@ -69,148 +76,119 @@ def get_indexed_sentences(actual_sentences, word2idx, current_idx, filters, spli
         cumulative = 0        
         sep2 = None
         split_sentence = actual_sentence.split(" ")                        
-        updater = [sentence, cumulative, cum_size]
-        for idx, word in enumerate(split_sentence):
-            if word == "":
-                updater = update_data(word2idx[" "], *updater)
-            updater, word2idx, current_idx = update_for_word(word, word2idx, 
-                                        current_idx, updater, filters, spliters)
+        updater = [sentence, cumulative, cum_size, word2idx, current_idx]
+        for idx, word in enumerate(split_sentence):            
+            updater = update_for_word(word, updater, filters, spliters)
+            if idx < len(split_sentence) - 1:
+                updater = update_data(" ", *updater)
         sentences.append(updater[0])
-        cum_sizes.append(updater[-1])
+        cum_sizes.append(updater[2])
+        word2idx, current_idx = updater[-2:]
     return sentences, cum_sizes, word2idx, current_idx
 
 
 def apply_filters(word, filters, recursion = True):    
     for char in filters:
         if word.startswith(char):
-            return apply_filter(word[1:], filters)
+            return apply_filters(word[1:], filters)
     for char in filters:
         if word.endswith(char):
-            return apply_filter(word[:-1], filters)
+            return apply_filters(word[:-1], filters)
     return word    
 
 
-    # for char in filters:
-    #     if word == "p.m" or word == "a.m":
-    #         break
-    #     word = word.replace(char, "")        
-    # return word
+def parse_exceptions(word, updater):
+    if word == "musicAnyway":
+        updater = update_data("music", *updater)
+        updater = update_data("Anyway", *updater)
+    elif word == "longbut":
+        updater = update_data("long", *updater)
+        updater = update_data("but", *updater)
+    elif word == "usedMoreover":
+        updater = update_data("used", *updater)
+        updater = update_data("Moreover", *updater)
+    elif word == "questionit":
+        updater = update_data("question", *updater)
+        updater = update_data("it", *updater)
+    return updater
 
 
-def check_split(word, spliters):
-    for char in spliters:
-        if char in word:
-            return sep    
+def split_word(word, splited, updater):
+    for spliter in splited:
+        if spliter in word:
+            splits = word.split(spliter)
+            if splits[-1] in sep_exclusions:
+                compose_word = "-".join(splits[:-1])
+                updater = update_data(compose_word, *updater)                
+                splits = [splits[-1]]
+                updater = update_data(spliter, *updater)
+            for idx, sep_word in enumerate(splits):
+                updater = split_word(sep_word, splited, updater)                
+                updater = update_data(sep_word, *updater)
+                if idx < len(splits) - 1:
+                    updater = update_data(spliter, *updater)
+    return updater
 
 
-def update_for_word(word, word2idx, current_idx, updater, filters, spliters):            
-    actual_word = apply_filters(word, filters)
-    spliter = check_split(actual_word, spliters)
-    if not spliter:
-        idx_min = word.find(actual_word)
-        idx_max = idx_min + len(actual_word)
-        
-    
+def update_for_word(word, updater, filters, spliters):  
+    isolated_word = apply_filters(word, filters)
+    splited = [char for char in spliters if char in word]               
+    updater = update_from_isolated(word, isolated_word, updater, splited)            
+    return updater
 
-def update_data(idx, sentence, cumulative, cum_size, length = 1):
-    sentence.append(idx)
-    cumulative += length
+
+def update_from_isolated(word, isolated_word, updater, splited):    
+    idx_min = word.find(isolated_word)
+    idx_max = idx_min + len(isolated_word)
+    condition = (idx_max - idx_min == len(word) 
+                and not splited 
+                and isolated_word not in word_exceptions)
+    if condition:                        
+        return update_data(word, *updater)
+    if idx_min > 0:
+        for idx in range(idx_min):
+            char = word[idx]
+            updater = update_data(char, *updater)
+    if not splited:        
+        if isolated_word in word_exceptions:
+            updater = parse_exceptions(isolated_word, updater)
+        else:
+            updater = update_data(isolated_word, *updater)
+    else:
+        updater = split_word(isolated_word, splited, updater)        
+    if idx_min + len(isolated_word) < len(word):            
+        for idx in range(idx_max, len(word)):
+            char = word[idx]
+            updater = update_data(char, *updater)
+    return updater
+
+
+def update_data(word, sentence, cumulative, cum_size, word2idx, current_idx):
+    if word not in word2idx:
+        word2idx[word] = current_idx
+        current_idx += 1
+    sentence.append(word2idx[word])
+    cumulative += len(word)
     cum_size.append(cumulative)
-    return sentence, cumulative, cum_size
-
-# def get_indexed_sentences(actual_sentences, word2idx, current_idx, filters):
-#     sentences = []
-#     cum_sizes = []
-#     for actual_sentence in actual_sentences:        
-#         sentence = []
-#         cum_size = [0]
-#         cumulative = 0        
-#         sep2 = None
-#         split_sentence = actual_sentence.split(" ")                        
-#         for idx, word in enumerate(split_sentence):
-#             if word == "":
-#                 sentence.append(word2idx[" "])
-#                 cumulative += 1
-#                 cum_size.append(cumulative)
-#                 continue
-#             word, sep = filtered_word(word, filters)
-#             if word.startswith('"') or word.startswith("'") or word.startswith("("):                    
-#                 sentence.append(word2idx[word[0]])
-#                 word = word[1:]
-#                 cumulative += 1
-#                 cum_size.append(cumulative)
-#             if word.startswith(";"):
-#                 sentence.append(word2idx[word[0]])
-#                 word = word[1:]
-#                 cumulative += 1
-#                 cum_size.append(cumulative)
-#             original_word = word
-#             if word.endswith('"') or word.endswith("'") or word.endswith(")"):                
-#                 word = word[:-1]
-#                 word, sep2 = filtered_word(word, filters)
-#             if "/" in word:
-#                 splits = word.split("/")
-#                 for idx, wrd in enumerate(splits):
-#                     if wrd not in word2idx:
-#                         word2idx[wrd] = current_idx
-#                         current_idx += 1
-#                     sentence.append(word2idx[wrd])
-#                     cumulative += len(wrd)
-#                     cum_size.append(cumulative)
-#                     if idx < len(splits) - 1:
-#                         sentence.append(word2idx["/"])
-#                         cumulative += 1
-#                         cum_size.append(cumulative)
-#             elif word == "p.m." or word == "a.m.":
-#                 if word[:-1] not in word2idx:
-#                     word2idx[word[:-1]] = current_idx
-#                     current_idx += 1
-#                 sentence.append(word2idx[word[:-1]])
-#                 cumulative += len(word[:-1])
-#                 cum_size.append(cumulative)
-#                 sentence.append(word2idx["."])
-#                 cumulative += 1            
-#                 cum_size.append(cumulative)          
-#             else:
-#                 if word not in word2idx:                
-#                     word2idx[word] = current_idx
-#                     current_idx += 1
-#                 sentence.append(word2idx[word])
-#                 cumulative += len(word)
-#                 cum_size.append(cumulative)
-#             if original_word.endswith('"') or original_word.endswith("'") or original_word.endswith(")"):
-#                 if sep2:
-#                     sentence.append(word2idx[sep2])
-#                     cumulative += 1
-#                     cum_size.append(cumulative)
-#                 sentence.append(word2idx[original_word[-1]])
-#                 cumulative += 1
-#                 cum_size.append(cumulative)    
-#             if sep:
-#                 sentence.append(word2idx[sep])
-#                 cumulative += 1
-#                 cum_size.append(cumulative)
-#             if idx < len(split_sentence) - 1:
-#                 sentence.append(word2idx[" "])
-#                 cumulative += 1            
-#                 cum_size.append(cumulative)
-#             elif idx == (len(split_sentence) - 1) and not sep:
-#                 sentence.append(word2idx[""])
-#                 cumulative += 1
-#                 cum_size.append(cumulative)
-#         sentences.append(sentence)
-#         cum_sizes.append(cum_size[:-1])
-#     return sentences, cum_sizes, word2idx, current_idx
+    return sentence, cumulative, cum_size, word2idx, current_idx
 
 
-def max_in_seqs(data, columns, param = "length"):
-    if "length" in param:
-        fun = len
-    elif "maximum" in param:
-        fun = max
-    max_len1 = max([fun(cur_data) if cur_data else 0 for cur_data in data[columns[0]].tolist()])
-    max_len2 = max([fun(cur_data) if cur_data else 0 for cur_data in data[columns[1]].tolist()])    
-    return max(max_len1, max_len2)
+def large_typo(isolated_word, word2idx, reference = 7):
+    if len(isolated_word) => 7:
+        largest = ""        
+        for idx in range(1, len(isolated_word)):
+            word = word[:idx]
+            if word in word2idx or word.lower() in word2idx:
+                largest = word if len(word) > len(largest) else largest
+        if largest == isolated_word:
+            return
+        elif len(largest) > len(isolated_word) / 2:            
+            remainder = isolated_word.replace(largest, "")
+            if remainder in word2idx or remainder.lower() in word2idx:
+                idx_largest = isolated_word.find(largest)
+                if idx_largest == 0:
+                    return [largest, remainder]
+                else:
+                    return [remainder, largest]
 
-
-
+        

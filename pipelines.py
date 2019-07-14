@@ -29,7 +29,7 @@ def get_correct_positions(data, word2idx, label2idx):
             sentence_problem = correct_sentences[idx]
             import ipdb; ipdb.set_trace()
 
-
+    import ipdb; ipdb.set_trace()
     incor_positions = []
     cor_positions = []
     found_corrects = []
