@@ -1,7 +1,7 @@
 import pandas as pd
 
-from pipelines import get_correct_positions
-from utils import get_indices
+from fce.pipelines import get_correct_positions
+from fce.utils import get_indices
 
 
 if __name__ == "__main__":

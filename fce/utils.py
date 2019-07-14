@@ -1,6 +1,6 @@
 from math import isnan
 
-from constants import filters, spliters, sep_exclusions, word_exceptions
+from .constants import filters, spliters, sep_exclusions, word_exceptions
 
 
 def initial_instance(filters, spliters):
