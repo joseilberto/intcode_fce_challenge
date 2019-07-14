@@ -9,7 +9,7 @@ There are 2 required steps in the challenge:
 
 - [X] Detect in which positions between the right and wrong sentences there is
 a required correction (implemented with a limited accuracy of 0.87);
-- [] Classify the correction based on the labels provided.
+- [ ] Classify the correction based on the labels provided.
 
 
 ## Installing dependencies ##
