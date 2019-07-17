@@ -51,12 +51,15 @@ def get_indices(data, filters = filters, spliters = spliters):
     corrects = data["correct_sentence"].tolist()
     incorrects = data["incorrect_sentence"].tolist()
     word2idx, current_idx = initial_instance(filters, spliters)
+    original_idx = current_idx
     correct_sentences, correct_text_pos, word2idx, current_idx = (
             get_indexed_sentences(corrects, word2idx, current_idx, filters, spliters))
     incorrect_sentences, incorrect_text_pos, word2idx, current_idx = (
             get_indexed_sentences(incorrects, word2idx, current_idx, filters, spliters))
     incorrect_positions, correct_positions, labels_types, label2idx = (
                                                 get_labels(data["labels"]))
+    correct_sentences = reindex_sentences(correct_sentences, word2idx, original_idx)
+    incorrect_sentences = reindex_sentences(incorrect_sentences, word2idx, original_idx)
     check_position_matches(incorrect_text_pos, correct_text_pos,
                                         incorrect_positions, correct_positions)
     data["correct_indexed"] = correct_sentences
@@ -67,6 +70,19 @@ def get_indices(data, filters = filters, spliters = spliters):
     data["correct_positions"] = correct_positions
     data["labels_types"] = labels_types
     return data, word2idx, label2idx
+
+
+def reindex_sentences(sentences, word2idx, original_cur_idx):
+    unchanged = {key: value for key, value in word2idx.items() if value < original_cur_idx}
+    reduced = {key: value for key, value in word2idx.items() if value >= original_cur_idx}
+    ordered = sorted(reduced.keys())    
+    ordered_word2idx = {key: reduced[key] for key in ordered}
+    ordered_word2idx.update(unchanged)
+    convert_dict = {word2idx[key]: value for key, value in ordered_word2idx.items()}
+    for idx in range(len(sentences)):
+        for idx2 in range(len(sentences[idx])):
+            sentences[idx][idx2] = convert_dict[sentences[idx][idx2]]            
+    return sentences
 
 
 def check_position_matches(incorrect_text_pos, correct_text_pos,
